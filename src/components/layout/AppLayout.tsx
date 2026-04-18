@@ -22,14 +22,16 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const operadorNav = [
+type NavItem = { to: string; label: string; icon: any; end?: boolean };
+
+const operadorNav: NavItem[] = [
   { to: "/", label: "Identificar lote", icon: Boxes, end: true },
   { to: "/lotes-pausados", label: "Lotes pausados", icon: PauseCircle },
   { to: "/lotes-sem-localizacao", label: "Sem localização", icon: MapPinOff },
   { to: "/mapa", label: "Mapa do estoque", icon: Map },
 ];
 
-const adminNav = [
+const adminNav: NavItem[] = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/tempo-real", label: "Tempo real", icon: Activity },
   { to: "/admin/produtos", label: "Produtos", icon: Package },
