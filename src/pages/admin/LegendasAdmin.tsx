@@ -11,7 +11,7 @@ import { Edit2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { logAudit } from "@/lib/audit";
 
-interface Legenda { id: string; sigla: string; descricao: string | null; cor: string; ativo: boolean }
+interface Legenda { id: string; sigla: string; descricao: string | null; cor: string }
 
 export default function LegendasAdmin() {
   const [items, setItems] = useState<Legenda[]>([]);
@@ -21,7 +21,7 @@ export default function LegendasAdmin() {
   const [form, setForm] = useState({ sigla: "", descricao: "", cor: "#10b981" });
 
   const load = async () => {
-    const { data } = await supabase.from("legendas").select("*").order("sigla");
+    const { data } = await supabase.from("legendas").select("id,sigla,descricao,cor").order("sigla");
     setItems((data as Legenda[]) ?? []);
   };
   useEffect(() => { load(); }, []);
@@ -46,9 +46,10 @@ export default function LegendasAdmin() {
 
   const remove = async () => {
     if (!deleting) return;
-    await supabase.from("legendas").update({ ativo: false }).eq("id", deleting.id);
+    const { error } = await supabase.from("legendas").delete().eq("id", deleting.id);
+    if (error) return toast.error("Erro ao excluir", { description: error.message });
     await logAudit({ acao: "excluir_legenda", entidade: "legendas", entidade_id: deleting.id, valor_anterior: deleting });
-    toast.success("Legenda desativada");
+    toast.success("Legenda excluída");
     setDeleting(null); load();
   };
 
@@ -100,8 +101,8 @@ export default function LegendasAdmin() {
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Desativar legenda?</AlertDialogTitle><AlertDialogDescription>Não aparecerá mais para os operadores.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={remove} className="bg-destructive text-destructive-foreground">Desativar</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>Excluir legenda?</AlertDialogTitle><AlertDialogDescription>Esta ação é permanente e não poderá ser desfeita.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={remove} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

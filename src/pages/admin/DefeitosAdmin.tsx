@@ -12,7 +12,7 @@ import { Edit2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { logAudit } from "@/lib/audit";
 
-interface Defeito { id: string; nome: string; descricao: string | null; ativo: boolean }
+interface Defeito { id: string; nome: string; descricao: string | null }
 
 export default function DefeitosAdmin() {
   const [items, setItems] = useState<Defeito[]>([]);
@@ -23,7 +23,7 @@ export default function DefeitosAdmin() {
   const [form, setForm] = useState({ nome: "", descricao: "" });
 
   const load = async () => {
-    const { data } = await supabase.from("defeitos").select("*").order("nome");
+    const { data } = await supabase.from("defeitos").select("id,nome,descricao").order("nome");
     setItems((data as Defeito[]) ?? []);
   };
   useEffect(() => { load(); }, []);
@@ -50,10 +50,10 @@ export default function DefeitosAdmin() {
 
   const remove = async () => {
     if (!deleting) return;
-    const { error } = await supabase.from("defeitos").update({ ativo: false }).eq("id", deleting.id);
-    if (error) return toast.error("Erro", { description: error.message });
+    const { error } = await supabase.from("defeitos").delete().eq("id", deleting.id);
+    if (error) return toast.error("Erro ao excluir", { description: error.message });
     await logAudit({ acao: "excluir_defeito", entidade: "defeitos", entidade_id: deleting.id, valor_anterior: deleting });
-    toast.success("Defeito desativado");
+    toast.success("Defeito excluído");
     setDeleting(null); load();
   };
 
@@ -70,15 +70,14 @@ export default function DefeitosAdmin() {
       <Card className="p-4">
         <Input className="mb-4" placeholder="Filtrar por nome..." value={filterNome} onChange={(e) => setFilterNome(e.target.value)} />
         <Table>
-          <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Descrição</TableHead><TableHead>Status</TableHead><TableHead className="w-32">Ações</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Descrição</TableHead><TableHead className="w-32">Ações</TableHead></TableRow></TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum defeito.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhum defeito.</TableCell></TableRow>
             ) : filtered.map((d) => (
               <TableRow key={d.id}>
                 <TableCell className="font-medium">{d.nome}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">{d.descricao ?? "—"}</TableCell>
-                <TableCell><span className={`text-xs px-2 py-0.5 rounded ${d.ativo ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></TableCell>
                 <TableCell>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" onClick={() => openEdit(d)}><Edit2 className="h-4 w-4" /></Button>
@@ -107,10 +106,10 @@ export default function DefeitosAdmin() {
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Desativar defeito?</AlertDialogTitle><AlertDialogDescription>Não aparecerá mais no cadastro de itens.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Excluir defeito?</AlertDialogTitle><AlertDialogDescription>Esta ação é permanente e não poderá ser desfeita.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={remove} className="bg-destructive text-destructive-foreground">Desativar</AlertDialogAction>
+            <AlertDialogAction onClick={remove} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
