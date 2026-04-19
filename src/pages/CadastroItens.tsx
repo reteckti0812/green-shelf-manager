@@ -243,6 +243,8 @@ export default function CadastroItens() {
 
   const pausarLote = async (auto = false) => {
     if (!lote) return;
+    // Se vinha de uma retomada, acumula o tempo decorrido desde o último retomado_em (ou início)
+    // Como já consideramos pausa_acumulada_seg, aqui apenas marcamos pausado_em e status.
     const { data, error } = await supabase
       .from("lotes")
       .update({
