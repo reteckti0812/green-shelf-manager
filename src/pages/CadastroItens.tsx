@@ -75,22 +75,27 @@ export default function CadastroItens() {
   const [deleting, setDeleting] = useState<Item | null>(null);
 
   // load
+  const loadItens = async () => {
+    if (!id) return;
+    const { data } = await supabase
+      .from("itens_lote")
+      .select("*, produtos(nome,marca), defeitos(nome)")
+      .eq("lote_id", id)
+      .order("ordem", { ascending: true });
+    setItens((data as Item[]) ?? []);
+  };
+
   const loadAll = async () => {
     if (!id) return;
-    const [loteRes, itensRes, prodRes, defRes] = await Promise.all([
+    const [loteRes, prodRes, defRes] = await Promise.all([
       supabase.from("lotes").select("*").eq("id", id).maybeSingle(),
-      supabase
-        .from("itens_lote")
-        .select("*, produtos(nome,marca), defeitos(nome)")
-        .eq("lote_id", id)
-        .order("ordem", { ascending: true }),
-      supabase.from("produtos").select("id,nome,marca").eq("ativo", true).order("nome"),
-      supabase.from("defeitos").select("id,nome").eq("ativo", true).order("nome"),
+      supabase.from("produtos").select("id,nome,marca").order("nome"),
+      supabase.from("defeitos").select("id,nome").order("nome"),
     ]);
     setLote(loteRes.data as Lote | null);
-    setItens((itensRes.data as Item[]) ?? []);
     setProdutos((prodRes.data as Produto[]) ?? []);
     setDefeitos((defRes.data as Defeito[]) ?? []);
+    await loadItens();
   };
 
   useEffect(() => {
@@ -98,19 +103,29 @@ export default function CadastroItens() {
     const ch = supabase
       .channel(`lote-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "itens_lote", filter: `lote_id=eq.${id}` }, () => {
-        loadAll();
+        loadItens();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "lotes", filter: `id=eq.${id}` }, (payload) => {
+        if (payload.new) setLote(payload.new as Lote);
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [id]);
 
-  // timer
+  // timer (sempre crescente desde o início do lote, descontando pausa acumulada)
   useEffect(() => {
     if (!lote) return;
     const update = () => {
-      const inicio = new Date(lote.retomado_em ?? lote.iniciado_em).getTime();
+      const inicio = new Date(lote.iniciado_em).getTime();
       const agora = Date.now();
-      setTempo(Math.floor((agora - inicio) / 1000));
+      const pausaAtual = lote.status === "pausado" && lote.pausado_em
+        ? Math.floor((agora - new Date(lote.pausado_em).getTime()) / 1000)
+        : 0;
+      const decorrido = Math.max(
+        0,
+        Math.floor((agora - inicio) / 1000) - (lote.pausa_acumulada_seg ?? 0) - pausaAtual
+      );
+      setTempo(decorrido);
     };
     update();
     const t = setInterval(update, 1000);
