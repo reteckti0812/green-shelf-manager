@@ -158,9 +158,18 @@ export default function CadastroItens() {
         ordem: novaOrdem,
         criado_por: user.id,
       })
-      .select()
+      .select("*, produtos(nome,marca), defeitos(nome)")
       .single();
     if (error) return toast.error("Erro ao adicionar", { description: error.message });
+
+    // Atualização instantânea (otimista) — o realtime confirma depois
+    if (data) {
+      setItens((prev) => {
+        if (prev.some((i) => i.id === data.id)) return prev;
+        return [...prev, data as Item];
+      });
+    }
+
     await logAudit({
       acao: "adicionar_item",
       entidade: "itens_lote",
@@ -197,14 +206,35 @@ export default function CadastroItens() {
   };
 
   const excluirItem = async () => {
-    if (!deleting || !online) return;
+    if (!deleting || !online || !id) return;
+
+    // Revalida no banco que ESTE item ainda é literalmente o último (maior ordem)
+    const { data: ultimoNoBanco } = await supabase
+      .from("itens_lote")
+      .select("id, ordem")
+      .eq("lote_id", id)
+      .order("ordem", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!ultimoNoBanco || ultimoNoBanco.id !== deleting.id) {
+      toast.error("Apenas o último item lançado pode ser excluído.");
+      setDeleting(null);
+      await loadItens();
+      return;
+    }
+
     const { error } = await supabase.from("itens_lote").delete().eq("id", deleting.id);
     if (error) return toast.error("Erro ao excluir", { description: error.message });
+
+    // Remove localmente de imediato (sem promover o anterior a "último editável")
+    setItens((prev) => prev.filter((i) => i.id !== deleting.id));
+
     await logAudit({
       acao: "excluir_item",
       entidade: "itens_lote",
       entidade_id: deleting.id,
-      descricao: "Item excluído",
+      descricao: "Último item excluído",
       valor_anterior: deleting,
     });
     setDeleting(null);
