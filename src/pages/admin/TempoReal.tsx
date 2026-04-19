@@ -19,12 +19,21 @@ export default function TempoReal() {
 
   useEffect(() => {
     load();
+    // canal único compartilhado por todos os clientes
     const ch = supabase
-      .channel("tempo-real")
-      .on("postgres_changes", { event: "*", schema: "public", table: "lotes" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "itens_lote" }, load)
+      .channel("tempo-real-lotes-itens")
+      .on("postgres_changes", { event: "*", schema: "public", table: "lotes" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "itens_lote" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "movimentacoes" }, () => load())
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+
+    // backup: poll a cada 10s para garantir consistência
+    const interval = setInterval(load, 10000);
+
+    return () => {
+      supabase.removeChannel(ch);
+      clearInterval(interval);
+    };
   }, []);
 
   return (

@@ -5,9 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -16,7 +14,7 @@ import { Edit2, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { logAudit } from "@/lib/audit";
 
-interface Produto { id: string; nome: string; marca: string | null; ativo: boolean }
+interface Produto { id: string; nome: string; marca: string | null }
 
 export default function ProdutosAdmin() {
   const [items, setItems] = useState<Produto[]>([]);
@@ -28,7 +26,7 @@ export default function ProdutosAdmin() {
   const [form, setForm] = useState({ nome: "", marca: "" });
 
   const load = async () => {
-    const { data } = await supabase.from("produtos").select("*").order("nome");
+    const { data } = await supabase.from("produtos").select("id,nome,marca").order("nome");
     setItems((data as Produto[]) ?? []);
   };
   useEffect(() => { load(); }, []);
@@ -58,10 +56,10 @@ export default function ProdutosAdmin() {
 
   const remove = async () => {
     if (!deleting) return;
-    const { error } = await supabase.from("produtos").update({ ativo: false }).eq("id", deleting.id);
-    if (error) return toast.error("Erro", { description: error.message });
+    const { error } = await supabase.from("produtos").delete().eq("id", deleting.id);
+    if (error) return toast.error("Erro ao excluir", { description: error.message });
     await logAudit({ acao: "excluir_produto", entidade: "produtos", entidade_id: deleting.id, descricao: deleting.nome, valor_anterior: deleting });
-    toast.success("Produto desativado");
+    toast.success("Produto excluído");
     setDeleting(null); load();
   };
 
@@ -87,16 +85,15 @@ export default function ProdutosAdmin() {
         </div>
         <Table>
           <TableHeader>
-            <TableRow><TableHead>Nome</TableHead><TableHead>Marca</TableHead><TableHead>Status</TableHead><TableHead className="w-32">Ações</TableHead></TableRow>
+            <TableRow><TableHead>Nome</TableHead><TableHead>Marca</TableHead><TableHead className="w-32">Ações</TableHead></TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum produto encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhum produto encontrado.</TableCell></TableRow>
             ) : filtered.map((p) => (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">{p.nome}</TableCell>
                 <TableCell className="text-muted-foreground">{p.marca ?? "—"}</TableCell>
-                <TableCell><span className={`text-xs px-2 py-0.5 rounded ${p.ativo ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>{p.ativo ? "Ativo" : "Inativo"}</span></TableCell>
                 <TableCell>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" onClick={() => openEdit(p)}><Edit2 className="h-4 w-4" /></Button>
@@ -126,12 +123,12 @@ export default function ProdutosAdmin() {
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Desativar "{deleting?.nome}"?</AlertDialogTitle>
-            <AlertDialogDescription>O produto deixará de aparecer no cadastro de itens.</AlertDialogDescription>
+            <AlertDialogTitle>Excluir "{deleting?.nome}"?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação é permanente e não poderá ser desfeita.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={remove} className="bg-destructive text-destructive-foreground">Desativar</AlertDialogAction>
+            <AlertDialogAction onClick={remove} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

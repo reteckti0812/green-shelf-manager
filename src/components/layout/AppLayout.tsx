@@ -21,6 +21,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import logoGlobo from "@/assets/logo-globo.png";
+import logoCompleto from "@/assets/logo-completo.png";
 
 type NavItem = { to: string; label: string; icon: any; end?: boolean };
 
@@ -59,18 +61,16 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen flex w-full bg-background">
-      {/* Sidebar */}
-      <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border">
+    <div className="min-h-screen w-full bg-background">
+      {/* Sidebar fixa */}
+      <aside className="fixed top-0 left-0 z-40 h-screen w-64 bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border">
         <div className="px-5 py-5 border-b border-sidebar-border">
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-md bg-sidebar-primary flex items-center justify-center">
-              <Boxes className="h-5 w-5 text-sidebar-primary-foreground" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-white">Almoxarifado</div>
-              <div className="text-[11px] uppercase tracking-wider text-sidebar-foreground/60">
-                Intranet corporativa
+          <div className="flex items-center gap-3">
+            <img src={logoGlobo} alt="Re-Teck" className="h-10 w-10 object-contain shrink-0" />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-white leading-tight">Re-Teck</div>
+              <div className="text-[10px] uppercase tracking-wider text-sidebar-foreground/60">
+                Reverse Supply Chain
               </div>
             </div>
           </div>
@@ -138,11 +138,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main com offset da sidebar fixa */}
+      <div className="ml-64 flex flex-col min-h-screen min-w-0">
         {/* Header */}
-        <header className="h-14 border-b border-border bg-card flex items-center justify-between px-6 sticky top-0 z-30">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6 sticky top-0 z-30">
+          <div className="flex items-center gap-4 min-w-0">
+            <img src={logoCompleto} alt="Re-Teck — Reverse Supply Chain Management" className="h-9 object-contain hidden sm:block" />
+            <div className="hidden md:block h-8 w-px bg-border" />
             <h1 className="text-base font-semibold truncate">{pageTitle(location.pathname)}</h1>
           </div>
           <div className="flex items-center gap-4">
@@ -171,13 +173,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </header>
 
         {!online && (
-          <div className="bg-destructive text-destructive-foreground px-6 py-2.5 text-sm flex items-center gap-2">
+          <div className="bg-destructive text-destructive-foreground px-6 py-2.5 text-sm flex items-center gap-2 sticky top-16 z-20">
             <ShieldAlert className="h-4 w-4" />
             Conexão perdida — novas ações estão bloqueadas. Lotes em andamento foram pausados automaticamente.
           </div>
         )}
 
-        <main className="flex-1 overflow-auto p-6 animate-fade-in">{children}</main>
+        <main className="flex-1 p-6 animate-fade-in">{children}</main>
       </div>
     </div>
   );

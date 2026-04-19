@@ -75,22 +75,27 @@ export default function CadastroItens() {
   const [deleting, setDeleting] = useState<Item | null>(null);
 
   // load
+  const loadItens = async () => {
+    if (!id) return;
+    const { data } = await supabase
+      .from("itens_lote")
+      .select("*, produtos(nome,marca), defeitos(nome)")
+      .eq("lote_id", id)
+      .order("ordem", { ascending: true });
+    setItens((data as Item[]) ?? []);
+  };
+
   const loadAll = async () => {
     if (!id) return;
-    const [loteRes, itensRes, prodRes, defRes] = await Promise.all([
+    const [loteRes, prodRes, defRes] = await Promise.all([
       supabase.from("lotes").select("*").eq("id", id).maybeSingle(),
-      supabase
-        .from("itens_lote")
-        .select("*, produtos(nome,marca), defeitos(nome)")
-        .eq("lote_id", id)
-        .order("ordem", { ascending: true }),
-      supabase.from("produtos").select("id,nome,marca").eq("ativo", true).order("nome"),
-      supabase.from("defeitos").select("id,nome").eq("ativo", true).order("nome"),
+      supabase.from("produtos").select("id,nome,marca").order("nome"),
+      supabase.from("defeitos").select("id,nome").order("nome"),
     ]);
     setLote(loteRes.data as Lote | null);
-    setItens((itensRes.data as Item[]) ?? []);
     setProdutos((prodRes.data as Produto[]) ?? []);
     setDefeitos((defRes.data as Defeito[]) ?? []);
+    await loadItens();
   };
 
   useEffect(() => {
@@ -98,19 +103,29 @@ export default function CadastroItens() {
     const ch = supabase
       .channel(`lote-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "itens_lote", filter: `lote_id=eq.${id}` }, () => {
-        loadAll();
+        loadItens();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "lotes", filter: `id=eq.${id}` }, (payload) => {
+        if (payload.new) setLote(payload.new as Lote);
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [id]);
 
-  // timer
+  // timer (sempre crescente desde o início do lote, descontando pausa acumulada)
   useEffect(() => {
     if (!lote) return;
     const update = () => {
-      const inicio = new Date(lote.retomado_em ?? lote.iniciado_em).getTime();
+      const inicio = new Date(lote.iniciado_em).getTime();
       const agora = Date.now();
-      setTempo(Math.floor((agora - inicio) / 1000));
+      const pausaAtual = lote.status === "pausado" && lote.pausado_em
+        ? Math.floor((agora - new Date(lote.pausado_em).getTime()) / 1000)
+        : 0;
+      const decorrido = Math.max(
+        0,
+        Math.floor((agora - inicio) / 1000) - (lote.pausa_acumulada_seg ?? 0) - pausaAtual
+      );
+      setTempo(decorrido);
     };
     update();
     const t = setInterval(update, 1000);
@@ -143,9 +158,18 @@ export default function CadastroItens() {
         ordem: novaOrdem,
         criado_por: user.id,
       })
-      .select()
+      .select("*, produtos(nome,marca), defeitos(nome)")
       .single();
     if (error) return toast.error("Erro ao adicionar", { description: error.message });
+
+    // Atualização instantânea (otimista) — o realtime confirma depois
+    if (data) {
+      setItens((prev) => {
+        if (prev.some((i) => i.id === data.id)) return prev;
+        return [...prev, data as Item];
+      });
+    }
+
     await logAudit({
       acao: "adicionar_item",
       entidade: "itens_lote",
@@ -182,14 +206,35 @@ export default function CadastroItens() {
   };
 
   const excluirItem = async () => {
-    if (!deleting || !online) return;
+    if (!deleting || !online || !id) return;
+
+    // Revalida no banco que ESTE item ainda é literalmente o último (maior ordem)
+    const { data: ultimoNoBanco } = await supabase
+      .from("itens_lote")
+      .select("id, ordem")
+      .eq("lote_id", id)
+      .order("ordem", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!ultimoNoBanco || ultimoNoBanco.id !== deleting.id) {
+      toast.error("Apenas o último item lançado pode ser excluído.");
+      setDeleting(null);
+      await loadItens();
+      return;
+    }
+
     const { error } = await supabase.from("itens_lote").delete().eq("id", deleting.id);
     if (error) return toast.error("Erro ao excluir", { description: error.message });
+
+    // Remove localmente de imediato (sem promover o anterior a "último editável")
+    setItens((prev) => prev.filter((i) => i.id !== deleting.id));
+
     await logAudit({
       acao: "excluir_item",
       entidade: "itens_lote",
       entidade_id: deleting.id,
-      descricao: "Item excluído",
+      descricao: "Último item excluído",
       valor_anterior: deleting,
     });
     setDeleting(null);
@@ -198,6 +243,8 @@ export default function CadastroItens() {
 
   const pausarLote = async (auto = false) => {
     if (!lote) return;
+    // Se vinha de uma retomada, acumula o tempo decorrido desde o último retomado_em (ou início)
+    // Como já consideramos pausa_acumulada_seg, aqui apenas marcamos pausado_em e status.
     const { data, error } = await supabase
       .from("lotes")
       .update({
