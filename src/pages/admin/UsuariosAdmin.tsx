@@ -44,7 +44,15 @@ export default function UsuariosAdmin() {
     }));
     setProfiles(merged);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const ch = supabase
+      .channel(`usuarios-admin-${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_roles" }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   const openNew = () => { setEditing(null); setForm(blankForm); setOpen(true); };
   const openEdit = (p: ProfileRow) => {
