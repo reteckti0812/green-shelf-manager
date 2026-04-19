@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
@@ -33,6 +34,7 @@ import { formatDateTime } from "@/lib/format";
 
 export default function MapaPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [reload, setReload] = useState(0);
   const [openLoteId, setOpenLoteId] = useState<string | null>(null);
   const [loteDetalhe, setLoteDetalhe] = useState<any>(null);
@@ -55,18 +57,45 @@ export default function MapaPage() {
   }, [openLoteId, reload]);
 
   const reabrir = async () => {
-    if (!loteDetalhe || !user) return;
+    if (!loteDetalhe || !user) {
+      toast.error("Carregando dados do lote, tente novamente.");
+      return;
+    }
+    const origemLoc = loteDetalhe.localizacao_id;
     const { error } = await supabase
       .from("lotes")
-      .update({ status: "em_andamento", retomado_em: new Date().toISOString() })
+      .update({
+        status: "em_andamento",
+        retomado_em: new Date().toISOString(),
+        finalizado_em: null,
+        localizacao_id: null,
+      })
       .eq("id", loteDetalhe.id);
-    if (error) return toast.error("Erro", { description: error.message });
-    await supabase.from("movimentacoes").insert({
-      lote_id: loteDetalhe.id, tipo: "reabertura", usuario_id: user.id,
+    if (error) {
+      console.error("Erro ao reabrir:", error);
+      return toast.error("Erro ao reabrir", { description: error.message });
+    }
+    const { error: movErr } = await supabase.from("movimentacoes").insert({
+      lote_id: loteDetalhe.id,
+      tipo: "reabertura",
+      localizacao_origem_id: origemLoc,
+      usuario_id: user.id,
     });
-    await logAudit({ acao: "reabrir_lote", entidade: "lotes", entidade_id: loteDetalhe.id, descricao: "Lote reaberto" });
-    toast.success("Lote reaberto");
-    setConfirmAction(null); setOpenLoteId(null); setReload((r) => r + 1);
+    if (movErr) console.warn("Mov erro:", movErr);
+    await logAudit({
+      acao: "reabrir_lote",
+      entidade: "lotes",
+      entidade_id: loteDetalhe.id,
+      descricao: `Lote ${loteDetalhe.nome} reaberto`,
+      valor_anterior: { status: loteDetalhe.status, localizacao_id: origemLoc },
+      valor_novo: { status: "em_andamento" },
+    });
+    toast.success("Lote reaberto — você pode adicionar novos itens");
+    const loteId = loteDetalhe.id;
+    setConfirmAction(null);
+    setOpenLoteId(null);
+    setReload((r) => r + 1);
+    navigate(`/lote/${loteId}`);
   };
 
   const saida = async () => {
