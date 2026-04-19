@@ -55,18 +55,21 @@ export function MapaEstoque({
     });
   }, [reload]);
 
-  // realtime: atualiza quando lotes mudam
+  // realtime: atualiza quando lotes mudam (canal único por instância para evitar colisão)
   useEffect(() => {
+    const channelName = `mapa-lotes-${Math.random().toString(36).slice(2)}`;
+    const refetch = () => {
+      supabase
+        .from("lotes")
+        .select("id,nome,b2b,status,localizacao_id")
+        .not("localizacao_id", "is", null)
+        .neq("status", "expedido")
+        .then(({ data }) => setLotes((data as LoteOcupado[]) ?? []));
+    };
     const ch = supabase
-      .channel("mapa-lotes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "lotes" }, () => {
-        supabase
-          .from("lotes")
-          .select("id,nome,b2b,status,localizacao_id")
-          .not("localizacao_id", "is", null)
-          .neq("status", "expedido")
-          .then(({ data }) => setLotes((data as LoteOcupado[]) ?? []));
-      })
+      .channel(channelName)
+      .on("postgres_changes", { event: "*", schema: "public", table: "lotes" }, refetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "movimentacoes" }, refetch)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
