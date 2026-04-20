@@ -28,12 +28,33 @@ export default function LotesPausados() {
   useEffect(() => { load(); }, []);
 
   const retomar = async (lote: Lote) => {
+    // Acumula o tempo que o lote ficou pausado para que o timer não conte a pausa
+    const { data: atual } = await supabase
+      .from("lotes")
+      .select("pausa_acumulada_seg, pausado_em")
+      .eq("id", lote.id)
+      .maybeSingle();
+    const pausaExtra = atual?.pausado_em
+      ? Math.max(0, Math.floor((Date.now() - new Date(atual.pausado_em).getTime()) / 1000))
+      : 0;
+    const novaAcumulada = (atual?.pausa_acumulada_seg ?? 0) + pausaExtra;
+
     const { error } = await supabase
       .from("lotes")
-      .update({ status: "em_andamento", retomado_em: new Date().toISOString(), pausado_em: null })
+      .update({
+        status: "em_andamento",
+        retomado_em: new Date().toISOString(),
+        pausado_em: null,
+        pausa_acumulada_seg: novaAcumulada,
+      })
       .eq("id", lote.id);
     if (error) return toast.error("Erro ao retomar", { description: error.message });
-    await logAudit({ acao: "retomar_lote", entidade: "lotes", entidade_id: lote.id, descricao: `Lote ${lote.nome} retomado` });
+    await logAudit({
+      acao: "retomar_lote",
+      entidade: "lotes",
+      entidade_id: lote.id,
+      descricao: `Lote ${lote.nome} retomado (+${pausaExtra}s de pausa acumulados)`,
+    });
     toast.success("Lote retomado");
     navigate(`/lote/${lote.id}`);
   };
