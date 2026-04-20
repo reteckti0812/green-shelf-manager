@@ -152,9 +152,41 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Lotes, itens e movimentações ficam preservados via ON DELETE SET NULL
-      // e snapshots (operador_nome, criado_por_nome) salvos no momento do registro.
+      // Verifica vínculos: se houver lotes, itens ou movimentações, faz soft delete (desativa)
+      const [{ count: lotesCount }, { count: itensCount }, { count: movsCount }] = await Promise.all([
+        admin.from("lotes").select("id", { count: "exact", head: true }).eq("operador_id", user_id),
+        admin.from("itens_lote").select("id", { count: "exact", head: true }).eq("criado_por", user_id),
+        admin.from("movimentacoes").select("id", { count: "exact", head: true }).eq("usuario_id", user_id),
+      ]);
+      const totalVinculos = (lotesCount ?? 0) + (itensCount ?? 0) + (movsCount ?? 0);
 
+      if (totalVinculos > 0) {
+        // Soft delete: desativa o usuário e bloqueia login (sem remover histórico)
+        const { error: profErr } = await admin
+          .from("profiles")
+          .update({ ativo: false })
+          .eq("user_id", user_id);
+        if (profErr) {
+          console.error("soft delete profile error:", profErr);
+          throw profErr;
+        }
+        // Bloqueia login banindo o usuário (100 anos)
+        const { error: banErr } = await admin.auth.admin.updateUserById(user_id, {
+          ban_duration: "876000h",
+        });
+        if (banErr) console.error("ban user error:", banErr);
+
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            soft_deleted: true,
+            message: `Usuário desativado (possui ${totalVinculos} registro(s) vinculado(s)).`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // Sem vínculos: exclusão definitiva
       const { error: rolesErr } = await admin.from("user_roles").delete().eq("user_id", user_id);
       if (rolesErr) console.error("delete user_roles error:", rolesErr);
 
@@ -166,6 +198,28 @@ Deno.serve(async (req) => {
         console.error("auth deleteUser error:", error);
         throw error;
       }
+      return new Response(JSON.stringify({ ok: true, soft_deleted: false }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "reactivate") {
+      const { user_id } = body;
+      if (!user_id) {
+        return new Response(JSON.stringify({ error: "user_id é obrigatório" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { error: profErr } = await admin
+        .from("profiles")
+        .update({ ativo: true })
+        .eq("user_id", user_id);
+      if (profErr) throw profErr;
+      const { error: unbanErr } = await admin.auth.admin.updateUserById(user_id, {
+        ban_duration: "none",
+      });
+      if (unbanErr) console.error("unban user error:", unbanErr);
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
