@@ -1,6 +1,6 @@
 // Admin user management: create, update, delete users
 // verify_jwt = false (validates JWT in-code via getClaims to support ES256 keys)
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,15 +32,16 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
-    if (claimsErr || !claimsData?.claims?.sub) {
-      console.error("Auth error:", claimsErr);
+    // Valida o token e obtém o user id (compatível com qualquer versão do SDK)
+    const { data: userData, error: userErr } = await userClient.auth.getUser(token);
+    if (userErr || !userData?.user?.id) {
+      console.error("Auth error:", userErr);
       return new Response(JSON.stringify({ error: "Não autenticado" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const callerId = claimsData.claims.sub as string;
+    const callerId = userData.user.id;
 
     // Verifica se o usuário chamador é admin (via service role para evitar problemas com RLS)
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
