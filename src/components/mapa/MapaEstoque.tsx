@@ -110,6 +110,13 @@ export function MapaEstoque({
     }
   }, [selectedId, locs]);
 
+  // abre a primeira rua por padrão para não exibir tela em branco
+  useEffect(() => {
+    if (ruaSelecionada === null && ruas.length > 0) {
+      setRuaSelecionada(ruas[0].rua);
+    }
+  }, [ruas, ruaSelecionada]);
+
   // contagem de ocupação por rua
   const statsRua = useMemo(() => {
     const stats = new Map<number, { total: number; ocupados: number }>();
