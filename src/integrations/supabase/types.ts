@@ -353,6 +353,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ativo: boolean
           cargo: string | null
           created_at: string
           id: string
@@ -361,6 +362,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ativo?: boolean
           cargo?: string | null
           created_at?: string
           id?: string
@@ -369,6 +371,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ativo?: boolean
           cargo?: string | null
           created_at?: string
           id?: string
