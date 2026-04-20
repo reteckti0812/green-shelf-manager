@@ -152,29 +152,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Reatribui lotes do usuário ao admin que está executando a exclusão
-      const { error: reassignErr } = await admin
-        .from("lotes")
-        .update({ operador_id: callerId })
-        .eq("operador_id", user_id);
-      if (reassignErr) {
-        console.error("lotes reassign error:", reassignErr);
-        throw reassignErr;
-      }
-
-      // Reatribui itens_lote criados pelo usuário ao admin
-      const { error: itensErr } = await admin
-        .from("itens_lote")
-        .update({ criado_por: callerId })
-        .eq("criado_por", user_id);
-      if (itensErr) console.error("itens_lote reassign error:", itensErr);
-
-      // Reatribui movimentações
-      const { error: movErr } = await admin
-        .from("movimentacoes")
-        .update({ usuario_id: callerId })
-        .eq("usuario_id", user_id);
-      if (movErr) console.error("movimentacoes reassign error:", movErr);
+      // Lotes, itens e movimentações ficam preservados via ON DELETE SET NULL
+      // e snapshots (operador_nome, criado_por_nome) salvos no momento do registro.
 
       const { error: rolesErr } = await admin.from("user_roles").delete().eq("user_id", user_id);
       if (rolesErr) console.error("delete user_roles error:", rolesErr);

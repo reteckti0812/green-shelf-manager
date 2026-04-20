@@ -11,7 +11,7 @@ export default function TempoReal() {
   const load = async () => {
     const { data } = await supabase
       .from("lotes")
-      .select("*, profiles!operador_id(nome), itens_lote(count)")
+      .select("*, itens_lote(count)")
       .in("status", ["em_andamento", "pausado"])
       .order("iniciado_em", { ascending: false });
     setLotes(data ?? []);
@@ -68,7 +68,7 @@ export default function TempoReal() {
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground space-y-0.5">
-                  <div>Operador: <span className="text-foreground font-medium">{l.profiles?.nome ?? "—"}</span></div>
+                  <div>Operador: <span className="text-foreground font-medium">{l.operador_nome ?? "—"}</span></div>
                   <div>Itens: <span className="text-foreground font-medium">{l.itens_lote?.[0]?.count ?? 0}</span></div>
                   <div>Início: {formatDateTime(l.iniciado_em)}</div>
                   <div>Tipo: {l.b2b ? "B2B" : "Não B2B"}</div>
