@@ -80,35 +80,47 @@ export type Database = {
       itens_lote: {
         Row: {
           created_at: string
-          criado_por: string
+          criado_por: string | null
+          criado_por_nome: string | null
           defeito_id: string | null
+          defeito_nome: string | null
           id: string
           lote_id: string
           observacao: string | null
           ordem: number
-          produto_id: string
+          produto_id: string | null
+          produto_marca: string | null
+          produto_nome: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
-          criado_por: string
+          criado_por?: string | null
+          criado_por_nome?: string | null
           defeito_id?: string | null
+          defeito_nome?: string | null
           id?: string
           lote_id: string
           observacao?: string | null
           ordem: number
-          produto_id: string
+          produto_id?: string | null
+          produto_marca?: string | null
+          produto_nome?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
-          criado_por?: string
+          criado_por?: string | null
+          criado_por_nome?: string | null
           defeito_id?: string | null
+          defeito_nome?: string | null
           id?: string
           lote_id?: string
           observacao?: string | null
           ordem?: number
-          produto_id?: string
+          produto_id?: string | null
+          produto_marca?: string | null
+          produto_nome?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -203,7 +215,8 @@ export type Database = {
           localizacao_id: string | null
           nome: string
           observacao: string | null
-          operador_id: string
+          operador_id: string | null
+          operador_nome: string | null
           pausa_acumulada_seg: number
           pausado_em: string | null
           retomado_em: string | null
@@ -220,7 +233,8 @@ export type Database = {
           localizacao_id?: string | null
           nome: string
           observacao?: string | null
-          operador_id: string
+          operador_id?: string | null
+          operador_nome?: string | null
           pausa_acumulada_seg?: number
           pausado_em?: string | null
           retomado_em?: string | null
@@ -237,7 +251,8 @@ export type Database = {
           localizacao_id?: string | null
           nome?: string
           observacao?: string | null
-          operador_id?: string
+          operador_id?: string | null
+          operador_nome?: string | null
           pausa_acumulada_seg?: number
           pausado_em?: string | null
           retomado_em?: string | null
@@ -263,7 +278,7 @@ export type Database = {
           lote_id: string
           observacao: string | null
           tipo: Database["public"]["Enums"]["movimentacao_tipo"]
-          usuario_id: string
+          usuario_id: string | null
         }
         Insert: {
           created_at?: string
@@ -273,7 +288,7 @@ export type Database = {
           lote_id: string
           observacao?: string | null
           tipo: Database["public"]["Enums"]["movimentacao_tipo"]
-          usuario_id: string
+          usuario_id?: string | null
         }
         Update: {
           created_at?: string
@@ -283,7 +298,7 @@ export type Database = {
           lote_id?: string
           observacao?: string | null
           tipo?: Database["public"]["Enums"]["movimentacao_tipo"]
-          usuario_id?: string
+          usuario_id?: string | null
         }
         Relationships: [
           {
