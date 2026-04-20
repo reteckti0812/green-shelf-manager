@@ -152,23 +152,29 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Verifica se o usuário tem lotes vinculados — se tiver, bloqueia exclusão
-      const { count: lotesCount, error: lotesErr } = await admin
+      // Reatribui lotes do usuário ao admin que está executando a exclusão
+      const { error: reassignErr } = await admin
         .from("lotes")
-        .select("id", { count: "exact", head: true })
+        .update({ operador_id: callerId })
         .eq("operador_id", user_id);
-      if (lotesErr) {
-        console.error("lotes count error:", lotesErr);
-        throw lotesErr;
+      if (reassignErr) {
+        console.error("lotes reassign error:", reassignErr);
+        throw reassignErr;
       }
-      if ((lotesCount ?? 0) > 0) {
-        return new Response(
-          JSON.stringify({
-            error: `Este usuário possui ${lotesCount} lote(s) vinculado(s) e não pode ser excluído. Reatribua os lotes antes.`,
-          }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
+
+      // Reatribui itens_lote criados pelo usuário ao admin
+      const { error: itensErr } = await admin
+        .from("itens_lote")
+        .update({ criado_por: callerId })
+        .eq("criado_por", user_id);
+      if (itensErr) console.error("itens_lote reassign error:", itensErr);
+
+      // Reatribui movimentações
+      const { error: movErr } = await admin
+        .from("movimentacoes")
+        .update({ usuario_id: callerId })
+        .eq("usuario_id", user_id);
+      if (movErr) console.error("movimentacoes reassign error:", movErr);
 
       const { error: rolesErr } = await admin.from("user_roles").delete().eq("user_id", user_id);
       if (rolesErr) console.error("delete user_roles error:", rolesErr);
