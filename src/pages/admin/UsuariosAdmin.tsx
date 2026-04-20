@@ -11,7 +11,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Edit2, Plus, ShieldCheck, Trash2, User as UserIcon } from "lucide-react";
+import { Edit2, Plus, ShieldCheck, Trash2, User as UserIcon, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { logAudit } from "@/lib/audit";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +21,7 @@ interface ProfileRow {
   user_id: string;
   nome: string;
   cargo: string | null;
+  ativo: boolean;
   role: "admin" | "operador";
 }
 
@@ -120,13 +121,33 @@ export default function UsuariosAdmin() {
       return;
     }
     try {
-      await callAdminFn("delete", { user_id: deleting.user_id });
+      const res: any = await callAdminFn("delete", { user_id: deleting.user_id });
       await logAudit({
-        acao: "excluir_usuario", entidade: "profiles", entidade_id: deleting.user_id,
+        acao: res?.soft_deleted ? "desativar_usuario" : "excluir_usuario",
+        entidade: "profiles", entidade_id: deleting.user_id,
         descricao: deleting.nome, valor_anterior: deleting,
       });
-      toast.success("Usuário excluído");
+      if (res?.soft_deleted) {
+        toast.success("Usuário desativado", {
+          description: "Possui registros vinculados — foi mantido como inativo para preservar o histórico.",
+        });
+      } else {
+        toast.success("Usuário excluído");
+      }
       setDeleting(null);
+      load();
+    } catch (e: any) {
+      toast.error("Erro", { description: e.message });
+    }
+  };
+
+  const reactivate = async (p: ProfileRow) => {
+    try {
+      await callAdminFn("reactivate", { user_id: p.user_id });
+      await logAudit({
+        acao: "reativar_usuario", entidade: "profiles", entidade_id: p.user_id, descricao: p.nome,
+      });
+      toast.success("Usuário reativado");
       load();
     } catch (e: any) {
       toast.error("Erro", { description: e.message });
@@ -155,8 +176,15 @@ export default function UsuariosAdmin() {
           </TableHeader>
           <TableBody>
             {profiles.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell className="font-medium">{p.nome}</TableCell>
+              <TableRow key={p.id} className={!p.ativo ? "opacity-60" : ""}>
+                <TableCell className="font-medium">
+                  {p.nome}
+                  {!p.ativo && (
+                    <span className="ml-2 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                      Desativado
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell className="text-muted-foreground">{p.cargo ?? "—"}</TableCell>
                 <TableCell>
                   <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded ${p.role === "admin" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
@@ -169,13 +197,23 @@ export default function UsuariosAdmin() {
                     <Button size="icon" variant="ghost" onClick={() => openEdit(p)}>
                       <Edit2 className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="icon" variant="ghost" className="text-destructive"
-                      disabled={p.user_id === currentUser?.id}
-                      onClick={() => setDeleting(p)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {!p.ativo ? (
+                      <Button
+                        size="icon" variant="ghost" className="text-primary"
+                        title="Reativar usuário"
+                        onClick={() => reactivate(p)}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="icon" variant="ghost" className="text-destructive"
+                        disabled={p.user_id === currentUser?.id}
+                        onClick={() => setDeleting(p)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -232,13 +270,15 @@ export default function UsuariosAdmin() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir "{deleting?.nome}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              O usuário será removido permanentemente do sistema. Esta ação não pode ser desfeita.
+              Se este usuário tiver lotes, itens ou movimentações vinculados, ele será apenas <strong>desativado</strong> (não poderá mais entrar no sistema, mas o histórico será preservado).
+              <br /><br />
+              Caso não tenha nenhum vínculo, será excluído permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={remove} className="bg-destructive text-destructive-foreground">
-              Excluir
+              Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
