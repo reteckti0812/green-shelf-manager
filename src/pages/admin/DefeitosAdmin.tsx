@@ -51,7 +51,16 @@ export default function DefeitosAdmin() {
   const remove = async () => {
     if (!deleting) return;
     const { error } = await supabase.from("defeitos").delete().eq("id", deleting.id);
-    if (error) return toast.error("Erro ao excluir", { description: error.message });
+    if (error) {
+      if (error.code === "23503" || /foreign key/i.test(error.message)) {
+        toast.error("Não é possível excluir", {
+          description: "Este defeito já foi usado em lotes. Edite ou renomeie em vez de excluir.",
+        });
+      } else {
+        toast.error("Erro ao excluir", { description: error.message });
+      }
+      return;
+    }
     await logAudit({ acao: "excluir_defeito", entidade: "defeitos", entidade_id: deleting.id, valor_anterior: deleting });
     toast.success("Defeito excluído");
     setDeleting(null); load();
