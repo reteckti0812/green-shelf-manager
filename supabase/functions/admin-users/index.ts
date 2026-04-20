@@ -100,7 +100,10 @@ Deno.serve(async (req) => {
       if (password) updateAuth.password = password;
       if (Object.keys(updateAuth).length) {
         const { error } = await admin.auth.admin.updateUserById(user_id, updateAuth);
-        if (error) throw error;
+        if (error) {
+          console.error("updateUserById error:", error);
+          throw error;
+        }
       }
       if (nome !== undefined || cargo !== undefined) {
         const { error } = await admin
@@ -110,12 +113,23 @@ Deno.serve(async (req) => {
             ...(cargo !== undefined && { cargo }),
           })
           .eq("user_id", user_id);
-        if (error) throw error;
+        if (error) {
+          console.error("profiles update error:", error);
+          throw error;
+        }
       }
       if (role) {
-        await admin.from("user_roles").delete().eq("user_id", user_id);
-        const { error } = await admin.from("user_roles").insert({ user_id, role });
-        if (error) throw error;
+        // remove TODOS os roles atuais (inclusive duplicatas) e insere o novo
+        const { error: delErr } = await admin.from("user_roles").delete().eq("user_id", user_id);
+        if (delErr) {
+          console.error("user_roles delete error:", delErr);
+          throw delErr;
+        }
+        const { error: insErr } = await admin.from("user_roles").insert({ user_id, role });
+        if (insErr) {
+          console.error("user_roles insert error:", insErr);
+          throw insErr;
+        }
       }
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -136,10 +150,36 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      await admin.from("user_roles").delete().eq("user_id", user_id);
-      await admin.from("profiles").delete().eq("user_id", user_id);
+
+      // Verifica se o usuário tem lotes vinculados — se tiver, bloqueia exclusão
+      const { count: lotesCount, error: lotesErr } = await admin
+        .from("lotes")
+        .select("id", { count: "exact", head: true })
+        .eq("operador_id", user_id);
+      if (lotesErr) {
+        console.error("lotes count error:", lotesErr);
+        throw lotesErr;
+      }
+      if ((lotesCount ?? 0) > 0) {
+        return new Response(
+          JSON.stringify({
+            error: `Este usuário possui ${lotesCount} lote(s) vinculado(s) e não pode ser excluído. Reatribua os lotes antes.`,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const { error: rolesErr } = await admin.from("user_roles").delete().eq("user_id", user_id);
+      if (rolesErr) console.error("delete user_roles error:", rolesErr);
+
+      const { error: profErr } = await admin.from("profiles").delete().eq("user_id", user_id);
+      if (profErr) console.error("delete profiles error:", profErr);
+
       const { error } = await admin.auth.admin.deleteUser(user_id);
-      if (error) throw error;
+      if (error) {
+        console.error("auth deleteUser error:", error);
+        throw error;
+      }
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
