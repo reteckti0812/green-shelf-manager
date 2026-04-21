@@ -106,6 +106,11 @@ export default function CadastroItens() {
         loadItens();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "lotes", filter: `id=eq.${id}` }, (payload) => {
+        if (payload.eventType === "DELETE") {
+          toast.error("Este lote foi excluído por um administrador.");
+          navigate("/", { replace: true });
+          return;
+        }
         if (payload.new) setLote(payload.new as Lote);
       })
       .subscribe();
