@@ -14,7 +14,7 @@ import LotesSemLocalizacao from "./pages/LotesSemLocalizacao";
 import FinalizarLote from "./pages/FinalizarLote";
 import MapaPage from "./pages/MapaPage";
 import Dashboard from "./pages/admin/Dashboard";
-import TempoReal from "./pages/admin/TempoReal";
+import GestaoLotes from "./pages/admin/GestaoLotes";
 import ProdutosAdmin from "./pages/admin/ProdutosAdmin";
 import DefeitosAdmin from "./pages/admin/DefeitosAdmin";
 import LegendasAdmin from "./pages/admin/LegendasAdmin";
@@ -46,7 +46,7 @@ const App = () => (
             <Route path="/finalizar/:id" element={<Protected><FinalizarLote /></Protected>} />
             <Route path="/mapa" element={<Protected><MapaPage /></Protected>} />
             <Route path="/admin/dashboard" element={<Protected adminOnly><Dashboard /></Protected>} />
-            <Route path="/admin/tempo-real" element={<Protected adminOnly><TempoReal /></Protected>} />
+            <Route path="/admin/gestao-lotes" element={<Protected adminOnly><GestaoLotes /></Protected>} />
             <Route path="/admin/produtos" element={<Protected adminOnly><ProdutosAdmin /></Protected>} />
             <Route path="/admin/defeitos" element={<Protected adminOnly><DefeitosAdmin /></Protected>} />
             <Route path="/admin/legendas" element={<Protected adminOnly><LegendasAdmin /></Protected>} />

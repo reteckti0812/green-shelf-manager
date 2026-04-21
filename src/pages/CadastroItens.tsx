@@ -92,7 +92,12 @@ export default function CadastroItens() {
       supabase.from("produtos").select("id,nome,marca").order("nome"),
       supabase.from("defeitos").select("id,nome").order("nome"),
     ]);
-    setLote(loteRes.data as Lote | null);
+    if (!loteRes.data) {
+      toast.error("Lote não encontrado ou foi excluído.");
+      navigate("/", { replace: true });
+      return;
+    }
+    setLote(loteRes.data as Lote);
     setProdutos((prodRes.data as Produto[]) ?? []);
     setDefeitos((defRes.data as Defeito[]) ?? []);
     await loadItens();
@@ -106,6 +111,11 @@ export default function CadastroItens() {
         loadItens();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "lotes", filter: `id=eq.${id}` }, (payload) => {
+        if (payload.eventType === "DELETE") {
+          toast.error("Este lote foi excluído por um administrador.");
+          navigate("/", { replace: true });
+          return;
+        }
         if (payload.new) setLote(payload.new as Lote);
       })
       .subscribe();
