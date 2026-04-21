@@ -66,7 +66,22 @@ export default function UsuariosAdmin() {
     const { data, error } = await supabase.functions.invoke("admin-users", {
       body: { action, ...payload },
     });
-    if (error) throw new Error(error.message);
+    // FunctionsHttpError traz o corpo em error.context (Response). Tentamos extrair a mensagem amigável.
+    if (error) {
+      let friendly = error.message;
+      try {
+        const ctx: any = (error as any).context;
+        if (ctx && typeof ctx.json === "function") {
+          const body = await ctx.json();
+          if (body?.error) friendly = body.error;
+        } else if (ctx && typeof ctx.text === "function") {
+          const txt = await ctx.text();
+          try { const parsed = JSON.parse(txt); if (parsed?.error) friendly = parsed.error; }
+          catch { if (txt) friendly = txt; }
+        }
+      } catch { /* ignore parse errors */ }
+      throw new Error(friendly);
+    }
     if ((data as any)?.error) throw new Error((data as any).error);
     return data;
   };
