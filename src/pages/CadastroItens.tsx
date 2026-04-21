@@ -92,7 +92,12 @@ export default function CadastroItens() {
       supabase.from("produtos").select("id,nome,marca").order("nome"),
       supabase.from("defeitos").select("id,nome").order("nome"),
     ]);
-    setLote(loteRes.data as Lote | null);
+    if (!loteRes.data) {
+      toast.error("Lote não encontrado ou foi excluído.");
+      navigate("/", { replace: true });
+      return;
+    }
+    setLote(loteRes.data as Lote);
     setProdutos((prodRes.data as Produto[]) ?? []);
     setDefeitos((defRes.data as Defeito[]) ?? []);
     await loadItens();
