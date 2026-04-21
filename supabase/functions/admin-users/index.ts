@@ -100,6 +100,16 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      // Garante profile e role (caso o trigger handle_new_user falhe ou não exista)
+      const newUserId = data.user?.id;
+      if (newUserId) {
+        await admin.from("profiles").upsert(
+          { user_id: newUserId, nome, cargo: cargo ?? "Operador", ativo: true },
+          { onConflict: "user_id" },
+        );
+        await admin.from("user_roles").delete().eq("user_id", newUserId);
+        await admin.from("user_roles").insert({ user_id: newUserId, role: role ?? "operador" });
+      }
       return new Response(JSON.stringify({ user: data.user }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
