@@ -9,6 +9,7 @@ interface Profile {
   user_id: string;
   nome: string;
   cargo: string | null;
+  ativo?: boolean;
 }
 
 interface AuthCtx {
@@ -62,6 +63,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Detecta exclusão / desativação do próprio usuário e força logout
+  useEffect(() => {
+    if (!user?.id) return;
+    const uid = user.id;
+    const ch = supabase
+      .channel(`self-watch-${uid}`)
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "profiles", filter: `user_id=eq.${uid}` },
+        async () => {
+          await supabase.auth.signOut();
+          window.location.href = "/auth";
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `user_id=eq.${uid}` },
+        async (payload) => {
+          if ((payload.new as any)?.ativo === false) {
+            await supabase.auth.signOut();
+            window.location.href = "/auth";
+          }
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
