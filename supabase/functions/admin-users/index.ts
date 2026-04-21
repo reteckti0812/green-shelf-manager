@@ -82,7 +82,24 @@ Deno.serve(async (req) => {
         email_confirm: true,
         user_metadata: { nome, cargo, role },
       });
-      if (error) throw error;
+      if (error) {
+        const msg = (error.message || "").toLowerCase();
+        let friendly = error.message;
+        let status = 400;
+        if (msg.includes("already been registered") || msg.includes("already registered") || msg.includes("duplicate")) {
+          friendly = "Já existe um usuário cadastrado com este e-mail.";
+          status = 409;
+        } else if (msg.includes("invalid") && msg.includes("email")) {
+          friendly = "E-mail inválido. Verifique o formato.";
+        } else if (msg.includes("password")) {
+          friendly = "Senha inválida. Tente outra.";
+        }
+        console.error("createUser error:", error);
+        return new Response(JSON.stringify({ error: friendly }), {
+          status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({ user: data.user }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -103,7 +120,17 @@ Deno.serve(async (req) => {
         const { error } = await admin.auth.admin.updateUserById(user_id, updateAuth);
         if (error) {
           console.error("updateUserById error:", error);
-          throw error;
+          const msg = (error.message || "").toLowerCase();
+          let friendly = error.message;
+          let status = 400;
+          if (msg.includes("already been registered") || msg.includes("already registered") || msg.includes("duplicate")) {
+            friendly = "Já existe outro usuário com este e-mail.";
+            status = 409;
+          }
+          return new Response(JSON.stringify({ error: friendly }), {
+            status,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
       }
       if (nome !== undefined || cargo !== undefined) {
