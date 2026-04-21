@@ -11,7 +11,7 @@ import {
   Boxes,
   PauseCircle,
   MapPinOff,
-  Activity,
+  ListChecks,
   LogOut,
   WifiOff,
   Wifi,
@@ -35,7 +35,7 @@ const operadorNav: NavItem[] = [
 
 const adminNav: NavItem[] = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/admin/tempo-real", label: "Tempo real", icon: Activity },
+  { to: "/admin/gestao-lotes", label: "Gestão de lotes", icon: ListChecks },
   { to: "/admin/produtos", label: "Produtos", icon: Package },
   { to: "/admin/defeitos", label: "Defeitos", icon: AlertTriangle },
   { to: "/admin/legendas", label: "Legendas", icon: Tag },
