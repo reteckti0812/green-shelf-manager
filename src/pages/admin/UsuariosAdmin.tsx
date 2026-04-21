@@ -76,6 +76,14 @@ export default function UsuariosAdmin() {
     if (!editing && (!form.email.trim() || !form.password.trim())) {
       return toast.error("E-mail e senha são obrigatórios para criar usuário");
     }
+    if (!editing) {
+      const emailLower = form.email.trim().toLowerCase();
+      const existing = profiles.find((p) => !p.ativo);
+      // Apenas aviso amigável quando houver usuários desativados (podem ter o mesmo e-mail)
+      if (existing && emailLower) {
+        // nada bloqueante — o backend valida; apenas seguimos
+      }
+    }
     setSubmitting(true);
     try {
       if (editing) {
@@ -95,7 +103,7 @@ export default function UsuariosAdmin() {
         toast.success("Usuário atualizado");
       } else {
         const data: any = await callAdminFn("create", {
-          email: form.email, password: form.password, nome: form.nome, cargo: form.cargo, role: form.role,
+          email: form.email.trim(), password: form.password, nome: form.nome.trim(), cargo: form.cargo, role: form.role,
         });
         await logAudit({
           acao: "criar_usuario", entidade: "profiles", entidade_id: data?.user?.id,
@@ -107,7 +115,10 @@ export default function UsuariosAdmin() {
       setForm(blankForm);
       load();
     } catch (e: any) {
-      toast.error("Erro", { description: e.message });
+      const msg = e?.message || "Erro inesperado";
+      toast.error(editing ? "Não foi possível salvar" : "Não foi possível criar o usuário", {
+        description: msg,
+      });
     } finally {
       setSubmitting(false);
     }
