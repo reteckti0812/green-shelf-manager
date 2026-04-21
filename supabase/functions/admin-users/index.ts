@@ -27,13 +27,9 @@ Deno.serve(async (req) => {
     }
     const token = authHeader.replace("Bearer ", "");
 
-    // Cliente com o token do usuário, usado para validar identidade via getClaims
-    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    // Valida o token e obtém o user id (compatível com qualquer versão do SDK)
-    const { data: userData, error: userErr } = await userClient.auth.getUser(token);
+    // Valida o token via service role (funciona com chaves ES256 do novo sistema de signing keys)
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    const { data: userData, error: userErr } = await admin.auth.getUser(token);
     if (userErr || !userData?.user?.id) {
       console.error("Auth error:", userErr);
       return new Response(JSON.stringify({ error: "Não autenticado" }), {
@@ -43,8 +39,7 @@ Deno.serve(async (req) => {
     }
     const callerId = userData.user.id;
 
-    // Verifica se o usuário chamador é admin (via service role para evitar problemas com RLS)
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    // Verifica se o usuário chamador é admin
     const { data: roleRow, error: roleErr } = await admin
       .from("user_roles")
       .select("role")
