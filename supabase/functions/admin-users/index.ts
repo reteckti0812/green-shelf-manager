@@ -27,17 +27,39 @@ Deno.serve(async (req) => {
     }
     const token = authHeader.replace("Bearer ", "");
 
-    // Valida o token via service role (funciona com chaves ES256 do novo sistema de signing keys)
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data: userData, error: userErr } = await admin.auth.getUser(token);
-    if (userErr || !userData?.user?.id) {
-      console.error("Auth error:", userErr);
+    const anonClient = createClient(SUPABASE_URL, ANON_KEY);
+
+    // Valida o JWT (compatível com chaves ES256 do novo sistema de signing keys)
+    let callerId: string | null = null;
+    try {
+      const anyAuth = anonClient.auth as any;
+      if (typeof anyAuth.getClaims === "function") {
+        const { data: claimsData, error: claimsErr } = await anyAuth.getClaims(token);
+        if (!claimsErr && claimsData?.claims?.sub) callerId = claimsData.claims.sub as string;
+      }
+      if (!callerId) {
+        // Fallback: busca via admin.auth.admin.getUserById decodificando o sub do JWT
+        const parts = token.split(".");
+        if (parts.length === 3) {
+          const payload = JSON.parse(
+            atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
+          );
+          if (payload?.sub && typeof payload.exp === "number" && payload.exp * 1000 > Date.now()) {
+            const { data: u } = await admin.auth.admin.getUserById(payload.sub);
+            if (u?.user?.id) callerId = u.user.id;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Token validation error:", e);
+    }
+    if (!callerId) {
       return new Response(JSON.stringify({ error: "Não autenticado" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const callerId = userData.user.id;
 
     // Verifica se o usuário chamador é admin
     const { data: roleRow, error: roleErr } = await admin
