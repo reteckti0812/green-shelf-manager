@@ -66,7 +66,22 @@ export default function UsuariosAdmin() {
     const { data, error } = await supabase.functions.invoke("admin-users", {
       body: { action, ...payload },
     });
-    if (error) throw new Error(error.message);
+    // FunctionsHttpError traz o corpo em error.context (Response). Tentamos extrair a mensagem amigável.
+    if (error) {
+      let friendly = error.message;
+      try {
+        const ctx: any = (error as any).context;
+        if (ctx && typeof ctx.json === "function") {
+          const body = await ctx.json();
+          if (body?.error) friendly = body.error;
+        } else if (ctx && typeof ctx.text === "function") {
+          const txt = await ctx.text();
+          try { const parsed = JSON.parse(txt); if (parsed?.error) friendly = parsed.error; }
+          catch { if (txt) friendly = txt; }
+        }
+      } catch { /* ignore parse errors */ }
+      throw new Error(friendly);
+    }
     if ((data as any)?.error) throw new Error((data as any).error);
     return data;
   };
@@ -75,6 +90,14 @@ export default function UsuariosAdmin() {
     if (!form.nome.trim()) return toast.error("Nome é obrigatório");
     if (!editing && (!form.email.trim() || !form.password.trim())) {
       return toast.error("E-mail e senha são obrigatórios para criar usuário");
+    }
+    if (!editing) {
+      const emailLower = form.email.trim().toLowerCase();
+      const existing = profiles.find((p) => !p.ativo);
+      // Apenas aviso amigável quando houver usuários desativados (podem ter o mesmo e-mail)
+      if (existing && emailLower) {
+        // nada bloqueante — o backend valida; apenas seguimos
+      }
     }
     setSubmitting(true);
     try {
@@ -95,7 +118,7 @@ export default function UsuariosAdmin() {
         toast.success("Usuário atualizado");
       } else {
         const data: any = await callAdminFn("create", {
-          email: form.email, password: form.password, nome: form.nome, cargo: form.cargo, role: form.role,
+          email: form.email.trim(), password: form.password, nome: form.nome.trim(), cargo: form.cargo, role: form.role,
         });
         await logAudit({
           acao: "criar_usuario", entidade: "profiles", entidade_id: data?.user?.id,
@@ -107,7 +130,10 @@ export default function UsuariosAdmin() {
       setForm(blankForm);
       load();
     } catch (e: any) {
-      toast.error("Erro", { description: e.message });
+      const msg = e?.message || "Erro inesperado";
+      toast.error(editing ? "Não foi possível salvar" : "Não foi possível criar o usuário", {
+        description: msg,
+      });
     } finally {
       setSubmitting(false);
     }
